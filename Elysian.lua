@@ -26,9 +26,9 @@ getgenv().Elysian = {
         ['Auto Shoot'] = true,
         ['Airshot Function'] = {
             ['Enabled'] = true,
-            ['Part'] = "LowerTorso"
+            ['Part'] = "UpperTorso"
         },
-        ['Target Part'] = "HumanoidRootPart"
+        ['Target Part'] = "Head"
     },
     ['HvH'] = {
         ['Target Strafe'] = {
@@ -133,7 +133,7 @@ local function getPart()
         return targetPart
     end
 
-    return Plr.Character:FindFirstChild("HumanoidRootPart")
+    return Plr.Character:FindFirstChild("UpperTorso")
 end
 
 local function getPredictionValue()
