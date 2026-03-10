@@ -4435,4 +4435,5 @@ task.spawn(function()
         Options.ragebottargets:SetValues(updatedNames)
         task.wait(1.5)
     end
+
 end)
