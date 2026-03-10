@@ -2713,4 +2713,5 @@ TrailGroup:AddSlider('TrailSpeed', {
 -- Auto-start if enabled
 if TrailConfig.Enabled then
     TrailGroup.Options.TrailEnabled:SetValue(true)
+
 end
