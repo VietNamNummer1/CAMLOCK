@@ -2530,4 +2530,5 @@ end)
 
 LibrarySettings:AddButton("Rejoin", function()
 game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId)
+
 end)
