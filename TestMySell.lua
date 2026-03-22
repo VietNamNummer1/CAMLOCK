@@ -1,141 +1,133 @@
--- Tạo GUI cho mobile/PC (có Close + Minimize + Draggable)
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local player = Players.LocalPlayer
-local gui = Instance.new("ScreenGui")
-gui.Name = "TienAIMTEST"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 340)
-frame.Position = UDim2.new(0.5, -110, 0.5, -170)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Parent = gui
-
--- Title bar (có thể kéo)
-local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 35)
-titleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-titleBar.BorderSizePixel = 0
-titleBar.Parent = frame
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(0.7, 0, 1, 0)
-title.Position = UDim2.new(0.05, 0, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "Estro Mobile"
-title.TextColor3 = Color3.new(1,1,1)
-title.Font = Enum.Font.SourceSansBold
-title.TextSize = 20
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = titleBar
-
--- Nút Minimize (-)
-local minimizeBtn = Instance.new("TextButton")
-minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -70, 0, 2)
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-minimizeBtn.Text = "-"
-minimizeBtn.TextColor3 = Color3.new(1,1,1)
-minimizeBtn.Font = Enum.Font.SourceSansBold
-minimizeBtn.TextSize = 24
-minimizeBtn.Parent = titleBar
-
--- Nút Close (X)
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -35, 0, 2)
-closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-closeBtn.Text = "X"
-closeBtn.TextColor3 = Color3.new(1,1,1)
-closeBtn.Font = Enum.Font.SourceSansBold
-closeBtn.TextSize = 22
-closeBtn.Parent = titleBar
-
--- Biến trạng thái
-local minimized = false
-local originalSize = frame.Size
-local originalPos = frame.Position
-
--- Hàm tạo button toggle (như cũ, nhưng điều chỉnh vị trí)
-local function createToggleButton(name, yOffset, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 45)
-    btn.Position = UDim2.new(0.05, 0, 0, yOffset)
-    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Text = name .. ": OFF"
-    btn.Font = Enum.Font.SourceSans
-    btn.TextSize = 18
-    btn.Parent = frame
+-- ================== AIMBOT SETTINGS & LOGIC ==================
+getgenv().CustomAimbot = {
+    Enabled = false,
     
-    local state = false
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        btn.Text = name .. ": " .. (state and "ON" or "OFF")
-        btn.BackgroundColor3 = state and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(45, 45, 45)
-        callback(state)
-    end)
-    return btn
+    -- Setting từ bạn
+    Prediction = 0.128,
+    X_Offset   = 0.1452,
+    Y_Offset   = 0.1235,
+    AirOffset  = 0.735,
+    FallOffset = 0.712,
+    
+    -- Các setting khác (có thể chỉnh)
+    HitPart    = "Head",          -- Head / UpperTorso / HumanoidRootPart
+    FOV_Radius = 320,             -- bán kính FOV
+    Smoothing  = 0.88,            -- 0.8–0.95 (càng cao càng mượt nhưng chậm)
+    TeamCheck  = true,
+    VisibleCheck = true,
+}
+
+local Players       = game:GetService("Players")
+local RunService    = game:GetService("RunService")
+local UserInput     = game:GetService("UserInputService")
+local LocalPlayer   = Players.LocalPlayer
+local Camera        = workspace.CurrentCamera
+local Mouse         = LocalPlayer:GetMouse()
+
+local CurrentTarget = nil
+
+local function GetClosestInFOV()
+    local closest, minDist = nil, CustomAimbot.FOV_Radius
+    
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LocalPlayer or not plr.Character or not plr.Character:FindFirstChild("Humanoid") then
+            continue
+        end
+        if CustomAimbot.TeamCheck and plr.Team == LocalPlayer.Team then
+            continue
+        end
+        
+        local root = plr.Character:FindFirstChild(CustomAimbot.HitPart) or plr.Character:FindFirstChild("HumanoidRootPart")
+        if not root then continue end
+        
+        local screen, onScreen = Camera:WorldToViewportPoint(root.Position)
+        if not onScreen then continue end
+        
+        local dist = (Vector2.new(screen.X, screen.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+        if dist >= minDist then continue end
+        
+        if CustomAimbot.VisibleCheck then
+            local rayOrigin = Camera.CFrame.Position
+            local rayDir = (root.Position - rayOrigin).Unit * 1000
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+            
+            local result = workspace:Raycast(rayOrigin, rayDir, raycastParams)
+            if result and result.Instance:IsDescendantOf(plr.Character) then
+                closest = plr
+                minDist = dist
+            end
+        else
+            closest = plr
+            minDist = dist
+        end
+    end
+    return closest
 end
 
--- Các button toggle (bắt đầu từ dưới title bar)
-local y = 45  -- bắt đầu sau title
-createToggleButton("Aimbot", y, function(s) estro.aimbot.Settings.Enabled = s end); y = y + 50
-createToggleButton("Silent Aim", y, function(s) estro.Silent.Settings.Enable = s end); y = y + 50
-createToggleButton("Speed Walk", y, function(s) estro.Movement.Settings.SpeedWalk.Enabled = s end); y = y + 50
-createToggleButton("Aim TP", y, function(s) estro.aimbot.Settings.AimTP.Use = s end); y = y + 50
-createToggleButton("Emote Macro", y, function(s) estro.Macro.Settings.Emote.Enable = s end); y = y + 50
+local function GetPredictedPosition(target)
+    if not target or not target.Character then return nil end
+    
+    local part = target.Character:FindFirstChild(CustomAimbot.HitPart) or target.Character.HumanoidRootPart
+    if not part then return nil end
+    
+    local velocity = part.Velocity
+    local basePos = part.Position + (velocity * CustomAimbot.Prediction)
+    
+    local hum = target.Character:FindFirstChild("Humanoid")
+    if hum then
+        local state = hum:GetState()
+        if state == Enum.HumanoidStateType.Freefall then
+            basePos += Vector3.new(0, CustomAimbot.FallOffset, 0)
+        elseif state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Landed then
+            basePos += Vector3.new(0, CustomAimbot.AirOffset, 0)
+        end
+    end
+    
+    -- Áp dụng offset X Y
+    basePos += Vector3.new(CustomAimbot.X_Offset, CustomAimbot.Y_Offset, 0)
+    
+    return basePos
+end
 
--- Logic Minimize
-minimizeBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    if minimized then
-        frame.Size = UDim2.new(0, 220, 0, 35)
-        minimizeBtn.Text = "+"
-    else
-        frame.Size = originalSize
-        minimizeBtn.Text = "-"
+-- Main loop
+RunService.RenderStepped:Connect(function()
+    if not CustomAimbot.Enabled then
+        CurrentTarget = nil
+        return
+    end
+    
+    CurrentTarget = GetClosestInFOV()
+    
+    if CurrentTarget then
+        local predPos = GetPredictedPosition(CurrentTarget)
+        if predPos then
+            local screenPos = Camera:WorldToViewportPoint(predPos)
+            local mousePos = Vector2.new(Mouse.X, Mouse.Y)
+            local targetPos = Vector2.new(screenPos.X, screenPos.Y)
+            
+            local delta = (targetPos - mousePos) * CustomAimbot.Smoothing
+            mousemoverel(delta.X, delta.Y)
+        end
     end
 end)
+-- Thêm button thủ công (nếu không có hàm create)
+local aimbotBtn = Instance.new("TextButton")
+aimbotBtn.Size = UDim2.new(0.9, 0, 0, 45)
+aimbotBtn.Position = UDim2.new(0.05, 0, 0, 350)  -- chỉnh vị trí Y tùy ý
+aimbotBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+aimbotBtn.TextColor3 = Color3.new(1,1,1)
+aimbotBtn.Text = "Aimbot Custom: OFF"
+aimbotBtn.Font = Enum.Font.SourceSans
+aimbotBtn.TextSize = 18
+aimbotBtn.Parent = frame
 
--- Logic Close (đóng GUI hoàn toàn)
-closeBtn.MouseButton1Click:Connect(function()
-    gui:Destroy()
-end)
-
--- Làm GUI draggable (kéo thả)
-local dragging, dragInput, dragStart, startPos
-titleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-titleBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-    end
+local aimState = false
+aimbotBtn.Activated:Connect(function()  -- Activated tốt cho mobile
+    aimState = not aimState
+    CustomAimbot.Enabled = aimState
+    
+    aimbotBtn.Text = "Aimbot Custom: " .. (aimState and "ON" or "OFF")
+    aimbotBtn.BackgroundColor3 = aimState and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(45, 45, 45)
 end)
