@@ -1,285 +1,20 @@
--- Estro Mobile - ONLY AIMBOT (tối giản, setting chính xác theo yêu cầu)
--- Prediction = 0.128, X = 0.1452, Y = 0.1235, AirOffset = 0.735, FallOffset = 0.712
+local rainbowGradient = Instance.new("UIGradient")
+rainbowGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),    -- đỏ
+    ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 127, 0)),  -- cam
+    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 255, 0)),  -- vàng
+    ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 0)),    -- xanh lá
+    ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),    -- xanh dương
+    ColorSequenceKeypoint.new(0.83, Color3.fromRGB(75, 0, 130)),   -- chàm
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(148, 0, 211))   -- tím
+})
+rainbowGradient.Rotation = 45
+rainbowGradient.Parent = vu45
 
-local Players       = game:GetService("Players")
-local RunService    = game:GetService("RunService")
-local LocalPlayer   = Players.LocalPlayer
-local Camera        = workspace.CurrentCamera
-local Mouse         = LocalPlayer:GetMouse()
-
--- Setting aimbot
-getgenv().Aimbot = {
-    Enabled     = false,
-    Prediction  = 0.128,
-    X_Offset    = 0.1452,
-    Y_Offset    = 0.1235,
-    AirOffset   = 0.735,
-    FallOffset  = 0.712,
-    HitPart     = "Head",          -- đổi thành "UpperTorso" hoặc "HumanoidRootPart" nếu muốn
-    FOV_Radius  = 320,             -- bán kính FOV (giảm xuống 250-280 nếu aim quá rộng)
-    Smoothing   = 0.88,            -- tăng lên 0.92-0.96 nếu muốn mượt hơn (nhưng chậm hơn)
-    TeamCheck   = true,
-    VisibleCheck= true,
-}
-
-local CurrentTarget = nil
-
------------------------------------------------------------------
--- Hàm tìm mục tiêu gần nhất trong FOV
------------------------------------------------------------------
-local function GetClosestPlayer()
-    local closest, minDist = nil, Aimbot.FOV_Radius
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player == LocalPlayer or not player.Character then continue end
-        
-        local humanoid = player.Character:FindFirstChild("Humanoid")
-        if not humanoid or humanoid.Health <= 0 then continue end
-        
-        if Aimbot.TeamCheck and player.Team == LocalPlayer.Team then continue end
-        
-        local targetPart = player.Character:FindFirstChild(Aimbot.HitPart) 
-                         or player.Character:FindFirstChild("HumanoidRootPart")
-        if not targetPart then continue end
-        
-        local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-        if not onScreen then continue end
-        
-        local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-        if distance >= minDist then continue end
-        
-        if Aimbot.VisibleCheck then
-            local rayParams           = RaycastParams.new()
-            rayParams.FilterType      = Enum.RaycastFilterType.Exclude
-            rayParams.FilterDescendantsInstances = {LocalPlayer.Character or game}
-            
-            local rayResult = workspace:Raycast(
-                Camera.CFrame.Position,
-                (targetPart.Position - Camera.CFrame.Position).Unit * 3000,
-                rayParams
-            )
-            
-            if rayResult and rayResult.Instance:IsDescendantOf(player.Character) then
-                closest = player
-                minDist = distance
-            end
-        else
-            closest = player
-            minDist = distance
-        end
-    end
-    
-    return closest
-end
-
------------------------------------------------------------------
--- Tính vị trí dự đoán + offset
------------------------------------------------------------------
-local function GetPredictedPosition(targetPlayer)
-    if not targetPlayer or not targetPlayer.Character then return nil end
-    
-    local part = targetPlayer.Character:FindFirstChild(Aimbot.HitPart) 
-               or targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not part then return nil end
-    
-    local velocity = part.Velocity
-    local predicted = part.Position + (velocity * Aimbot.Prediction)
-    
-    local humanoid = targetPlayer.Character:FindFirstChild("Humanoid")
-    if humanoid then
-        local state = humanoid:GetState()
-        if state == Enum.HumanoidStateType.Freefall then
-            predicted = predicted + Vector3.new(0, Aimbot.FallOffset, 0)
-        elseif state == Enum.HumanoidStateType.Jumping then
-            predicted = predicted + Vector3.new(0, Aimbot.AirOffset, 0)
-        end
-    end
-    
-    -- Áp dụng offset X Y
-    predicted = predicted + Vector3.new(Aimbot.X_Offset, Aimbot.Y_Offset, 0)
-    
-    return predicted
-end
-
------------------------------------------------------------------
--- Loop aim chính (chạy mỗi frame)
------------------------------------------------------------------
-RunService.RenderStepped:Connect(function()
-    if not Aimbot.Enabled then
-        CurrentTarget = nil
-        return
-    end
-    
-    CurrentTarget = GetClosestPlayer()
-    
-    if CurrentTarget then
-        local aimPosition = GetPredictedPosition(CurrentTarget)
-        if aimPosition then
-            local screenPoint = Camera:WorldToViewportPoint(aimPosition)
-            local currentMouse = Vector2.new(Mouse.X, Mouse.Y)
-            local targetMouse  = Vector2.new(screenPoint.X, screenPoint.Y)
-            
-            local delta = (targetMouse - currentMouse) * Aimbot.Smoothing
-            mousemoverel(delta.X, delta.Y)
-        end
-    end
-end)
-
------------------------------------------------------------------
--- GUI đơn giản chỉ có nút bật/tắt + đóng
------------------------------------------------------------------
-local gui = Instance.new("ScreenGui")
-gui.Name = "AimbotGUI"
-gui.ResetOnSpawn = false
-gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 200, 0, 160)
-frame.Position = UDim2.new(0.5, -100, 0.5, -80)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BorderSizePixel = 0
-frame.Parent = gui
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 35)
-title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-title.Text = "Aimbot Only"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Font = Enum.Font.SourceSansBold
-title.TextSize = 22
-title.Parent = frame
-
--- Nút Toggle
-local toggle = Instance.new("TextButton")
-toggle.Size = UDim2.new(0.8, 0, 0, 50)
-toggle.Position = UDim2.new(0.1, 0, 0.35, 0)
-toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-toggle.Text = "Aimbot: OFF"
-toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggle.Font = Enum.Font.SourceSans
-toggle.TextSize = 20
-toggle.Parent = frame
-
-local enabled = false
-toggle.Activated:Connect(function()
-    enabled = not enabled
-    Aimbot.Enabled = enabled
-    
-    toggle.Text = "Aimbot: " .. (enabled and "ON" or "OFF")
-    toggle.BackgroundColor3 = enabled and Color3.fromRGB(0, 170, 80) or Color3.fromRGB(60, 60, 60)
-end)
-
--- Nút đóng GUI
-local close = Instance.new("TextButton")
-close.Size = UDim2.new(0, 30, 0, 30)
-close.Position = UDim2.new(1, -35, 0, 3)
-close.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
-close.Text = "X"
-close.TextColor3 = Color3.fromRGB(255, 255, 255)
-close.Font = Enum.Font.SourceSansBold
-close.TextSize = 22
-close.Parent = frame
-
-close.Activated:Connect(function()
-    gui.Enabled = false
-    task.delay(0.08, function()
-        pcall(function() gui:Destroy() end)
-    end)
-end)
-
-print("Aimbot script loaded - GUI đã hiện, bấm để bật/tắt")        local part = plr.Character:FindFirstChild(Aimbot.HitPart) or plr.Character:FindFirstChild("HumanoidRootPart")
-        if not part then continue end
-        
-        local screen, onScreen = Camera:WorldToViewportPoint(part.Position)
-        if not onScreen then continue end
-        
-        local dist = (Vector2.new(screen.X, screen.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-        if dist >= minDist then continue end
-        
-        if Aimbot.VisibleCheck then
-            local rayParams = RaycastParams.new()
-            rayParams.FilterDescendantsInstances = {LocalPlayer.Character or {}}
-            rayParams.FilterType = Enum.RaycastFilterType.Exclude
-            
-            local result = workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 2000, rayParams)
-            if result and result.Instance:IsDescendantOf(plr.Character) then
-                closest = plr
-                minDist = dist
-            end
-        else
-            closest = plr
-            minDist = dist
-        end
-    end
-    return closest
-end
-
--- Tính vị trí predict + offset
-local function GetPredictedPos(target)
-    local part = target.Character:FindFirstChild(Aimbot.HitPart) or target.Character.HumanoidRootPart
-    if not part then return nil end
-    
-    local vel = part.Velocity
-    local pos = part.Position + vel * Aimbot.Prediction
-    
-    local hum = target.Character:FindFirstChild("Humanoid")
-    if hum then
-        local state = hum:GetState()
-        if state == Enum.HumanoidStateType.Freefall then
-            pos += Vector3.new(0, Aimbot.FallOffset, 0)
-        elseif state == Enum.HumanoidStateType.Jumping then
-            pos += Vector3.new(0, Aimbot.AirOffset, 0)
-        end
-    end
-    
-    pos += Vector3.new(Aimbot.X_Offset, Aimbot.Y_Offset, 0)
-    return pos
-end
-
--- Loop aim chính
-RunService.RenderStepped:Connect(function()
-    if not Aimbot.Enabled then
-        CurrentTarget = nil
-        return
-    end
-    
-    CurrentTarget = GetClosest()
-    if CurrentTarget then
-        local predPos = GetPredictedPos(CurrentTarget)
-        if predPos then
-            local screenPos = Camera:WorldToViewportPoint(predPos)
-            local mousePos = Vector2.new(Mouse.X, Mouse.Y)
-            local targetPos = Vector2.new(screenPos.X, screenPos.Y)
-            
-            local delta = (targetPos - mousePos) * Aimbot.Smoothing
-            mousemoverel(delta.X, delta.Y)
-        end
-    end
-end)
-
--- ================== GUI ĐƠN GIẢN CHỈ AIMBOT ==================
-local gui = Instance.new("ScreenGui")
-gui.Name = "AimbotOnlyGUI"
-gui.ResetOnSpawn = false
-gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 180, 0, 140)
-frame.Position = UDim2.new(0.5, -90, 0.5, -70)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BorderSizePixel = 0
-frame.Parent = gui
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 35)
-title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-title.Text = "Aimbot Only"
-title.TextColor3 = Color3.new(1,1,1)
-title.Font = Enum.Font.SourceSansBold
-title.TextSize = 20
-title.Parent = frame
-
--- Nút Toggle Aimbot
+-- Hiệu ứng chuyển động cầu vồng (offset liên tục)
+game:GetService("RunService").Heartbeat:Connect(function(dt)
+    rainbowGradient.Offset = Vector2.new((tick() * 0.15) % 1, 0)
+end)imbot
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.new(0.85, 0, 0, 50)
 toggleBtn.Position = UDim2.new(0.075, 0, 0.4, 0)
@@ -432,6 +167,66 @@ closeBtn.Activated:Connect(function()
         floatBtn:Destroy()  -- xóa floating sau khi mở
     end)
 end)
+-- Xóa BackgroundColor3 cũ của vu52
+vu52.BackgroundColor3 = Color3.new(1,1,1) -- tạm để gradient hoạt động
 
--- Draggable (kéo thả) - giữ nguyên nếu bạn có
--- (code draggable như trước, nếu cần paste lại thì bảo mình)
+local btnGradient = Instance.new("UIGradient")
+btnGradient.Color = rainbowGradient.Color -- dùng chung bảng màu
+btnGradient.Rotation = 90
+btnGradient.Parent = vu52
+
+-- Cập nhật offset giống frame chính
+game:GetService("RunService").Heartbeat:Connect(function()
+    btnGradient.Offset = Vector2.new((tick() * 0.2) % 1, 0)
+end)
+
+-- Khi hover thì tăng tốc độ rainbow
+vu52.MouseEnter:Connect(function()
+    btnGradient.Offset = Vector2.new((tick() * 0.4) % 1, 0) -- tăng tốc
+end)
+vu52.MouseLeave:Connect(function()
+    -- quay lại tốc độ bình thường (không cần làm gì vì Heartbeat vẫn chạy)
+end)
+local function updateCheckButton(btn, isOn)
+    if isOn then
+        btn.BackgroundColor3 = Color3.new(1,1,1) -- để gradient hiện
+        if not btn:FindFirstChild("RainbowGradient") then
+            local g = Instance.new("UIGradient")
+            g.Name = "RainbowGradient"
+            g.Color = rainbowGradient.Color
+            g.Rotation = 45
+            g.Parent = btn
+            
+            game:GetService("RunService").Heartbeat:Connect(function()
+                if btn:FindFirstChild("RainbowGradient") then
+                    g.Offset = Vector2.new((tick() * 0.25) % 1, 0)
+                end
+            end)
+        end
+    else
+        -- Tắt rainbow → quay về màu xám/tĩnh
+        local g = btn:FindFirstChild("RainbowGradient")
+        if g then g:Destroy() end
+        btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    end
+end
+
+-- Gọi lại mỗi khi toggle
+vu59.MouseButton1Click:Connect(function()
+    vu14.Checks.KnifeCheck = not vu14.Checks.KnifeCheck
+    vu59.Text = vu14.Checks.KnifeCheck and "Knife Check: ON" or "Knife Check: OFF"
+    updateCheckButton(vu59, vu14.Checks.KnifeCheck)
+    vu68()
+end)
+-- Với vu45
+local stroke = vu45:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke", vu45)
+stroke.Thickness = 3
+stroke.Transparency = 0.4
+
+local strokeGradient = Instance.new("UIGradient")
+strokeGradient.Color = rainbowGradient.Color
+strokeGradient.Parent = stroke
+
+game:GetService("RunService").Heartbeat:Connect(function()
+    strokeGradient.Offset = Vector2.new((tick() * 0.18) % 1, 0)
+end)
