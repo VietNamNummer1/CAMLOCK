@@ -94,7 +94,7 @@ local function loadCamlock()
     fov.NumSides = 80
     fov.Color = Color3.fromRGB(255, 80, 80)
     fov.Transparency = 0.85
-    fov.Filled = false
+    fov.Filled = true
 
     local gui = Instance.new(JkEIjBSwuTTAENBBglxsUzQLzHllYhYqMxpswTwJsYqqUryZoIkyQewVAGHDwiqEaqUreorMe('XQGDZqAsKxJrYADwfIDMQpjvwJPnWgKgsGKbsIujTXTTUjXAwAiAOsyU2NyZWVuR3Vp'), game.CoreGui)
     gui.ResetOnSpawn = false
