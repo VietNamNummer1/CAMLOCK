@@ -84,7 +84,6 @@ local LeftGroupBox = Tabs.Main:AddLeftGroupbox('General Settings')
 
 getgenv().Psalms = {
 	Enabled = true,
-	ResetOnSpawn = false
 	HorizontalPrediction = 0.1,
 	VerticalPrediction = 0.1,
 	jumpoffset = -1,
