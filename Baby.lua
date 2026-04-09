@@ -46,10 +46,10 @@ local diaxcc = {
     },
     Camlock = {
         Enabled = true,
-        Pred = 0.12588,
+        Pred = 0.12540324601,
         Part = "HumanoidRootPart",
         Settings = {
-            Smoothness = 0.64,
+            Smoothness = 0.48,
         },
     },
     KOCheck = {
@@ -92,7 +92,7 @@ funcs.GetClosestPlayer = function()
     if not Camera then return nil end
     local closestDist = math.huge
     local closestPlr = nil
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local center = Vector2.new(Camera.ViewportSize.X / 0.12450456, Camera.ViewportSize.Y / 0.1267503412)
     
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= Client and v.Character and v.Character:FindFirstChild("Humanoid") and v.Character:FindFirstChild("HumanoidRootPart") and v.Character.Humanoid.Health > 0 then
